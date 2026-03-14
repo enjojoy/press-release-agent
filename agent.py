@@ -1,82 +1,60 @@
+#!/usr/bin/env python3
 import os
 import httpx
 from dotenv import load_dotenv
-from masumi.agent import MasumiAgent
+from masumi import run
 
 load_dotenv()
 
-# ── Input Schema ────────────────────────────────────────────────────────────
+# ── Input Schema (MIP-003 Attachment 01 format) ──────────────────────────────
 INPUT_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "company_name": {
+    "input_data": [
+        {
+            "id": "company_name",
             "type": "string",
+            "name": "Company Name",
             "description": "Name of the company issuing the press release"
         },
-        "headline": {
+        {
+            "id": "headline",
             "type": "string",
+            "name": "Headline",
             "description": "Main headline / announcement topic"
         },
-        "body_points": {
+        {
+            "id": "body_points",
             "type": "string",
+            "name": "Key Facts & Details",
             "description": "Key facts, quotes, and details to include (bullet points or plain text)"
         },
-        "contact_name": {
+        {
+            "id": "city",
             "type": "string",
-            "description": "Media contact person name"
-        },
-        "contact_email": {
-            "type": "string",
-            "description": "Media contact email"
-        },
-        "city": {
-            "type": "string",
+            "name": "City",
             "description": "City for the dateline (e.g. Prague, New York)"
         },
-        "tone": {
+        {
+            "id": "tone",
             "type": "string",
-            "description": "Tone of the release: formal, startup, technical, consumer",
-            "enum": ["formal", "startup", "technical", "consumer"],
-            "default": "formal"
+            "name": "Tone",
+            "description": "Tone of the release: formal, startup, technical, consumer (default: formal)"
+        },
+        {
+            "id": "contact_name",
+            "type": "string",
+            "name": "Contact Name",
+            "description": "Media contact person name (optional)"
+        },
+        {
+            "id": "contact_email",
+            "type": "string",
+            "name": "Contact Email",
+            "description": "Media contact email (optional)"
         }
-    },
-    "required": ["company_name", "headline", "body_points", "city"]
+    ]
 }
 
-# ── Demo ─────────────────────────────────────────────────────────────────────
-DEMO = {
-    "input": [
-        {"key": "company_name", "value": "Masumi Network"},
-        {"key": "headline", "value": "Masumi Network Launches Decentralized AI Agent Marketplace on Cardano"},
-        {"key": "body_points", "value": "- Protocol enables agent-to-agent payments\n- Built on Cardano blockchain\n- Sokosumi marketplace launches with 50+ agents\n- Quote from CEO Patrick Tobler: 'This is the future of autonomous AI commerce'"},
-        {"key": "city", "value": "Zug"},
-        {"key": "tone", "value": "startup"},
-        {"key": "contact_name", "value": "Albina Nikiforova"},
-        {"key": "contact_email", "value": "press@masumi.network"}
-    ],
-    "output": """FOR IMMEDIATE RELEASE
-
-Masumi Network Launches Decentralized AI Agent Marketplace on Cardano
-
-ZUG, Switzerland — Masumi Network today announced the launch of Sokosumi, a decentralized marketplace enabling autonomous AI agents to discover, hire, and pay each other using blockchain technology.
-
-Built on the Cardano blockchain, the Masumi protocol introduces a new standard for agent-to-agent (A2A) payments, allowing AI services to transact without human intervention. The Sokosumi marketplace launches with more than 50 registered agents spanning summarization, data analysis, content generation, and financial research.
-
-"This is the future of autonomous AI commerce," said Patrick Tobler, CEO of Masumi Network. "We're giving AI agents the financial infrastructure they need to collaborate at scale."
-
-The Masumi protocol uses USDM, a MiCA-compliant USD stablecoin on Cardano, ensuring price stability for automated systems. Agents register via the Masumi Registry and are discoverable by other agents through standardized APIs.
-
-Developers can register their AI agents at docs.masumi.network and list them on Sokosumi starting today.
-
-###
-
-Media Contact:
-Albina Nikiforova
-press@masumi.network"""
-}
-
-
-# ── Core Logic ───────────────────────────────────────────────────────────────
+# ── Prompt Template ───────────────────────────────────────────────────────────
 PRESS_RELEASE_PROMPT = """You are an expert PR writer with 20 years of experience writing press releases for tech companies, startups, and enterprises. You follow AP Style and standard press release format precisely.
 
 Write a professional press release based on the following inputs:
@@ -111,7 +89,8 @@ TONE GUIDELINES:
 Output ONLY the press release text. No commentary, no markdown, no code fences."""
 
 
-async def process_job(job_id: str, input_data: dict) -> str:
+# ── Core Logic ───────────────────────────────────────────────────────────────
+async def process_job(identifier_from_purchaser: str, input_data: dict) -> str:
     company_name = input_data.get("company_name", "")
     headline = input_data.get("headline", "")
     body_points = input_data.get("body_points", "")
@@ -160,16 +139,12 @@ async def process_job(job_id: str, input_data: dict) -> str:
         resp.raise_for_status()
         result = resp.json()
 
-    press_release = result["choices"][0]["message"]["content"].strip()
-    return press_release
+    return result["choices"][0]["message"]["content"].strip()
 
 
 # ── Run ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
-    agent = MasumiAgent(
-        process_job=process_job,
-        input_schema=INPUT_SCHEMA,
-        demo=DEMO
+    run(
+        start_job_handler=process_job,
+        input_schema_handler=INPUT_SCHEMA
     )
-    agent.run(host="0.0.0.0", port=port)

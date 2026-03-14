@@ -1,1 +1,1 @@
-web: python agent.py
+web: masumi run agent.py
